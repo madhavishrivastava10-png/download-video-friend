@@ -15,6 +15,8 @@ import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDesignsRouteImport } from './routes/_authenticated/designs'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as ShareSlugRouteImport } from './routes/share.$slug'
+import { Route as AuthenticatedDesignDesignIdRouteImport } from './routes/_authenticated/design.$designId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -45,6 +47,17 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ShareSlugRoute = ShareSlugRouteImport.update({
+  id: '/share/$slug',
+  path: '/share/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedDesignDesignIdRoute =
+  AuthenticatedDesignDesignIdRouteImport.update({
+    id: '/design/$designId',
+    path: '/design/$designId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -52,6 +65,8 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/designs': typeof AuthenticatedDesignsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/share/$slug': typeof ShareSlugRoute
+  '/design/$designId': typeof AuthenticatedDesignDesignIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -59,6 +74,8 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/designs': typeof AuthenticatedDesignsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/share/$slug': typeof ShareSlugRoute
+  '/design/$designId': typeof AuthenticatedDesignDesignIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -68,12 +85,28 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/designs': typeof AuthenticatedDesignsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/share/$slug': typeof ShareSlugRoute
+  '/_authenticated/design/$designId': typeof AuthenticatedDesignDesignIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/create' | '/dashboard' | '/designs' | '/settings'
+  fullPaths:
+    | '/'
+    | '/create'
+    | '/dashboard'
+    | '/designs'
+    | '/settings'
+    | '/share/$slug'
+    | '/design/$designId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/create' | '/dashboard' | '/designs' | '/settings'
+  to:
+    | '/'
+    | '/create'
+    | '/dashboard'
+    | '/designs'
+    | '/settings'
+    | '/share/$slug'
+    | '/design/$designId'
   id:
     | '__root__'
     | '/'
@@ -82,11 +115,14 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/designs'
     | '/_authenticated/settings'
+    | '/share/$slug'
+    | '/_authenticated/design/$designId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  ShareSlugRoute: typeof ShareSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -133,6 +169,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/share/$slug': {
+      id: '/share/$slug'
+      path: '/share/$slug'
+      fullPath: '/share/$slug'
+      preLoaderRoute: typeof ShareSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/design/$designId': {
+      id: '/_authenticated/design/$designId'
+      path: '/design/$designId'
+      fullPath: '/design/$designId'
+      preLoaderRoute: typeof AuthenticatedDesignDesignIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
@@ -141,6 +191,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDesignsRoute: typeof AuthenticatedDesignsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedDesignDesignIdRoute: typeof AuthenticatedDesignDesignIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -148,6 +199,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDesignsRoute: AuthenticatedDesignsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedDesignDesignIdRoute: AuthenticatedDesignDesignIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -156,6 +208,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  ShareSlugRoute: ShareSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
