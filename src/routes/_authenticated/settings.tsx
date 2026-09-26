@@ -52,7 +52,7 @@ function SettingsPage() {
       .update({ display_name: displayName, bio })
       .eq("id", profile.id);
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Profile saved");
     queryClient.invalidateQueries({ queryKey: ["profile"] });
   }

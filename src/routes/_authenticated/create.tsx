@@ -14,9 +14,8 @@ import { CONTENT_TYPES, PLATFORMS, TEMPLATES, slugify } from "@/lib/reel-grid";
 type Search = { template?: string };
 
 export const Route = createFileRoute("/_authenticated/create")({
-  validateSearch: (search: Record<string, unknown>): Search => ({
-    template: typeof search['template'] === "string" ? (search['template'] as string) : undefined,
-  }),
+  validateSearch: (search: Record<string, unknown>): Search =>
+    typeof search['template'] === "string" ? { template: search['template'] as string } : {},
   head: () => ({
     meta: [
       { title: "Create a design — Reel Grid" },
@@ -38,8 +37,8 @@ function CreateWizard() {
   const [step, setStep] = useState(0);
   const [title, setTitle] = useState("My Instagram + YouTube Reels");
   const [layoutMode, setLayoutMode] = useState("fixed");
-  const [rows, setRows] = useState(preset.rows);
-  const [cols, setCols] = useState(preset.cols);
+  const [rows, setRows] = useState<number>(preset.rows);
+  const [cols, setCols] = useState<number>(preset.cols);
   const [platforms, setPlatforms] = useState<string[]>(["all"]);
   const [contentTypes, setContentTypes] = useState<string[]>(["all"]);
   const [passwordProtected, setPasswordProtected] = useState(false);

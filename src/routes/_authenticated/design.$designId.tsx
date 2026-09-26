@@ -156,7 +156,7 @@ function GridEditor() {
   async function removeItem(item: PlayableMedia) {
     if (item.storage_path) await supabase.storage.from("media").remove([item.storage_path]);
     const { error } = await supabase.from("media_items").delete().eq("id", item.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     setActive(null);
     toast.success("Removed");
     refresh();
@@ -164,7 +164,7 @@ function GridEditor() {
 
   async function saveCaption(item: PlayableMedia, caption: string) {
     const { error } = await supabase.from("media_items").update({ caption }).eq("id", item.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Saved");
     setActive(null);
     refresh();
@@ -187,7 +187,7 @@ function GridEditor() {
 
   async function togglePublic(next: boolean) {
     const { error } = await supabase.from("designs").update({ is_public: next }).eq("id", designId);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     queryClient.invalidateQueries({ queryKey: ["design", designId] });
   }
 

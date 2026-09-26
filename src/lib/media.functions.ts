@@ -65,7 +65,7 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
 
     const { error: uploadError } = await supabase.storage
       .from("media")
-      .upload(path, buffer, { contentType: contentType || undefined, upsert: false });
+      .upload(path, buffer, { contentType: contentType || "application/octet-stream", upsert: false });
     if (uploadError) throw new Error(uploadError.message);
 
     const { data: row, error } = await supabase

@@ -43,7 +43,7 @@ function DesignsPage() {
 
   async function remove(id: string) {
     const { error } = await supabase.from("designs").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Design deleted");
     queryClient.invalidateQueries({ queryKey: ["designs"] });
   }
@@ -57,7 +57,7 @@ function DesignsPage() {
       .insert({ ...rest, title: `${source.title} (copy)`, share_slug: slugify(source.title), is_public: false })
       .select()
       .single();
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
 
     const { data: items } = await supabase.from("media_items").select("*").eq("design_id", id);
     if (items?.length) {
