@@ -8,6 +8,13 @@
       "when": 1790423947508,
       "tag": "0000_create_reel_grid_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790423971736,
+      "tag": "0001_media_storage_policies",
+      "breakpoints": true
     }
   ]
 }
