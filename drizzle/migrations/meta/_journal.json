@@ -15,6 +15,13 @@
       "when": 1790423971736,
       "tag": "0001_media_storage_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790490036647,
+      "tag": "0002_create_favorites",
+      "breakpoints": true
     }
   ]
 }
