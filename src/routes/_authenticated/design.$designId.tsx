@@ -234,7 +234,7 @@ function GridEditor() {
             {item.media_type === "image" ? (
               <img src={item.playback_url} alt={item.caption ?? "Media"} className="size-full object-cover" />
             ) : (
-              <video src={item.playback_url} className="size-full object-cover" muted playsInline preload="metadata" />
+              <video src={`${item.playback_url}#t=0.1`} className="size-full object-cover" muted playsInline preload="metadata" />
             )}
             <span className="absolute left-2 top-2">
               <PlatformBadge platform={item.platform} />

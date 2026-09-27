@@ -92,7 +92,7 @@ function SharePage() {
               {item.media_type === "image" ? (
                 <img src={item.playback_url} alt={item.caption ?? "Media"} className="size-full object-cover" />
               ) : (
-                <video src={item.playback_url} controls playsInline className="size-full object-cover" />
+                <video src={`${item.playback_url}#t=0.1`} controls playsInline preload="metadata" className="size-full object-cover" />
               )}
               <span className="absolute left-2 top-2">
                 <PlatformBadge platform={item.platform} />
