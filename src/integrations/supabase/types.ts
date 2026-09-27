@@ -77,6 +77,35 @@ export type Database = {
         }
         Relationships: []
       }
+      favorites: {
+        Row: {
+          created_at: string
+          id: string
+          media_item_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          media_item_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          media_item_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "favorites_media_item_id_fkey"
+            columns: ["media_item_id"]
+            isOneToOne: false
+            referencedRelation: "media_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       media_items: {
         Row: {
           caption: string | null
