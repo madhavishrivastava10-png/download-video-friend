@@ -95,7 +95,11 @@ function GridEditor() {
     if (!url.trim()) return;
     setBusy(true);
     try {
-      await importUrl({ data: { designId, url: url.trim(), position: items.length } });
+      const result = await importUrl({ data: { designId, url: url.trim(), position: items.length } });
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
       toast.success("Saved — a permanent copy is now stored in your grid.");
       setUrl("");
       setAddOpen(false);
@@ -234,7 +238,7 @@ function GridEditor() {
             {item.media_type === "image" ? (
               <img src={item.playback_url} alt={item.caption ?? "Media"} className="size-full object-cover" />
             ) : (
-              <video src={item.playback_url} className="size-full object-cover" muted playsInline preload="metadata" />
+              <video src={`${item.playback_url}#t=0.1`} className="size-full object-cover" muted playsInline preload="metadata" />
             )}
             <span className="absolute left-2 top-2">
               <PlatformBadge platform={item.platform} />

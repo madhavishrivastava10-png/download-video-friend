@@ -26,38 +26,44 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
   .inputValidator((input: ImportInput) => input)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const fail = (message: string) => ({ ok: false as const, message });
 
     let parsed: URL;
     try {
       parsed = new URL(data.url);
     } catch {
-      throw new Error("That does not look like a valid link.");
+      return fail("That does not look like a valid link.");
     }
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      throw new Error("Only http and https links are supported.");
+      return fail("Only http and https links are supported.");
     }
 
-    const res = await fetch(parsed.toString(), {
-      headers: { "user-agent": "ReelGrid/1.0", accept: "video/*,image/*;q=0.9,*/*;q=0.5" },
-      redirect: "follow",
-    });
+    let res: Response;
+    try {
+      res = await fetch(parsed.toString(), {
+        headers: { "user-agent": "ReelGrid/1.0", accept: "video/*,image/*;q=0.9,*/*;q=0.5" },
+        redirect: "follow",
+      });
+    } catch {
+      return fail("We could not reach that link. Check it and try again.");
+    }
 
     if (!res.ok || !res.body) {
-      throw new Error(`Could not fetch that link (status ${res.status}).`);
+      return fail(`Could not fetch that link (status ${res.status}).`);
     }
 
     const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
     const isVideo = contentType.startsWith("video/");
     const isImage = contentType.startsWith("image/");
     if (!isVideo && !isImage) {
-      throw new Error(
-        "This link is a web page, not a video file. Paste a direct video file link (ending in .mp4) or upload the file instead.",
+      return fail(
+        "This link opens a web page, not a video file. Instagram, YouTube and Snapchat pages cannot be saved this way — paste a direct file link ending in .mp4 or upload the video from your device.",
       );
     }
 
     const buffer = new Uint8Array(await res.arrayBuffer());
     if (buffer.byteLength > MAX_BYTES) {
-      throw new Error("That file is larger than 200 MB.");
+      return fail("That file is larger than 200 MB.");
     }
 
     const ext = guessExtension(contentType, parsed.pathname);
@@ -66,7 +72,7 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
     const { error: uploadError } = await supabase.storage
       .from("media")
       .upload(path, buffer, { contentType: contentType || "application/octet-stream", upsert: false });
-    if (uploadError) throw new Error(uploadError.message);
+    if (uploadError) return fail(uploadError.message);
 
     const { data: row, error } = await supabase
       .from("media_items")
@@ -83,9 +89,9 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
       })
       .select()
       .single();
-    if (error) throw new Error(error.message);
+    if (error) return fail(error.message);
 
-    return row;
+    return { ok: true as const, item: row };
   });
 
 function detectPlatform(hostname: string) {
