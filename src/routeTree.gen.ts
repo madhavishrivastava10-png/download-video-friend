@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedDesignsRouteImport } from './routes/_authenticated/designs'
+import { Route as AuthenticatedFavoritesRouteImport } from './routes/_authenticated/favorites'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as ShareSlugRouteImport } from './routes/share.$slug'
 import { Route as AuthenticatedDesignDesignIdRouteImport } from './routes/_authenticated/design.$designId'
@@ -42,6 +43,11 @@ const AuthenticatedDesignsRoute = AuthenticatedDesignsRouteImport.update({
   path: '/designs',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedFavoritesRoute = AuthenticatedFavoritesRouteImport.update({
+  id: '/favorites',
+  path: '/favorites',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/create': typeof AuthenticatedCreateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/designs': typeof AuthenticatedDesignsRoute
+  '/favorites': typeof AuthenticatedFavoritesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/share/$slug': typeof ShareSlugRoute
   '/design/$designId': typeof AuthenticatedDesignDesignIdRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/create': typeof AuthenticatedCreateRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/designs': typeof AuthenticatedDesignsRoute
+  '/favorites': typeof AuthenticatedFavoritesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/share/$slug': typeof ShareSlugRoute
   '/design/$designId': typeof AuthenticatedDesignDesignIdRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/_authenticated/create': typeof AuthenticatedCreateRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/designs': typeof AuthenticatedDesignsRoute
+  '/_authenticated/favorites': typeof AuthenticatedFavoritesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/design/$designId': typeof AuthenticatedDesignDesignIdRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/create'
     | '/dashboard'
     | '/designs'
+    | '/favorites'
     | '/settings'
     | '/share/$slug'
     | '/design/$designId'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/create'
     | '/dashboard'
     | '/designs'
+    | '/favorites'
     | '/settings'
     | '/share/$slug'
     | '/design/$designId'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/_authenticated/create'
     | '/_authenticated/dashboard'
     | '/_authenticated/designs'
+    | '/_authenticated/favorites'
     | '/_authenticated/settings'
     | '/share/$slug'
     | '/_authenticated/design/$designId'
@@ -162,6 +174,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDesignsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/favorites': {
+      id: '/_authenticated/favorites'
+      path: '/favorites'
+      fullPath: '/favorites'
+      preLoaderRoute: typeof AuthenticatedFavoritesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -190,6 +209,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDesignsRoute: typeof AuthenticatedDesignsRoute
+  AuthenticatedFavoritesRoute: typeof AuthenticatedFavoritesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedDesignDesignIdRoute: typeof AuthenticatedDesignDesignIdRoute
 }
@@ -198,6 +218,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCreateRoute: AuthenticatedCreateRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDesignsRoute: AuthenticatedDesignsRoute,
+  AuthenticatedFavoritesRoute: AuthenticatedFavoritesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedDesignDesignIdRoute: AuthenticatedDesignDesignIdRoute,
 }
