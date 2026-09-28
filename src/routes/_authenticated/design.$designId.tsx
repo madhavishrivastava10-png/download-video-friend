@@ -7,6 +7,8 @@ import {
   Check,
   Code2,
   Copy,
+  Download,
+  Heart,
   Link2,
   Loader2,
   Play,
@@ -18,6 +20,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { importMediaFromUrl } from "@/lib/media.functions";
 import { signMedia, type PlayableMedia } from "@/lib/reel-grid";
+import { downloadMedia, mediaFilename } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,6 +82,16 @@ function GridEditor() {
       return signMedia(data);
     },
   });
+
+  const { data: favRows } = useQuery({
+    queryKey: ["favorites"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("favorites").select("id, media_item_id");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const favByMediaId = new Map((favRows ?? []).map((f) => [f.media_item_id, f.id]));
 
   const items = media ?? [];
   const cols = Math.min(design?.grid_cols ?? 3, 6);
@@ -189,6 +202,35 @@ function GridEditor() {
     refresh();
   }
 
+  async function toggleFavorite(item: PlayableMedia) {
+    const favId = favByMediaId.get(item.id);
+    if (favId) {
+      const { error } = await supabase.from("favorites").delete().eq("id", favId);
+      if (error) { toast.error(error.message); return; }
+    } else {
+      const { data: userRes } = await supabase.auth.getUser();
+      const uid = userRes.user?.id;
+      if (!uid) { toast.error("Please sign in again."); return; }
+      const { error } = await supabase
+        .from("favorites")
+        .insert({ user_id: uid, media_item_id: item.id });
+      if (error) { toast.error(error.message); return; }
+    }
+    queryClient.invalidateQueries({ queryKey: ["favorites"] });
+  }
+
+  async function handleDownload(item: PlayableMedia) {
+    setBusy(true);
+    try {
+      await downloadMedia(item.playback_url, mediaFilename(item.caption, item.media_type));
+      toast.success("Download started");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Download failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function togglePublic(next: boolean) {
     const { error } = await supabase.from("designs").update({ is_public: next }).eq("id", designId);
     if (error) { toast.error(error.message); return; }
@@ -242,6 +284,21 @@ function GridEditor() {
             )}
             <span className="absolute left-2 top-2">
               <PlatformBadge platform={item.platform} />
+            </span>
+            <span
+              role="button"
+              aria-label="Toggle favorite"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFavorite(item);
+              }}
+              className={`absolute right-2 top-2 grid size-7 place-items-center rounded-full shadow transition-colors ${
+                favByMediaId.has(item.id)
+                  ? "bg-card/90 text-primary"
+                  : "bg-foreground/35 text-background hover:bg-foreground/55"
+              }`}
+            >
+              <Heart className="size-3.5" fill={favByMediaId.has(item.id) ? "currentColor" : "none"} />
             </span>
             {item.media_type === "video" && (
               <span className="absolute inset-0 grid place-items-center">
@@ -332,6 +389,7 @@ function GridEditor() {
               busy={busy}
               onDelete={() => removeItem(active)}
               onReplace={() => replaceRef.current?.click()}
+              onDownload={() => handleDownload(active)}
               onSave={(caption) => saveCaption(active, caption)}
             />
           )}
@@ -406,12 +464,14 @@ function PlayerBody({
   busy,
   onDelete,
   onReplace,
+  onDownload,
   onSave,
 }: {
   item: PlayableMedia;
   busy: boolean;
   onDelete: () => void;
   onReplace: () => void;
+  onDownload: () => void;
   onSave: (caption: string) => void;
 }) {
   const [caption, setCaption] = useState(item.caption ?? "");
@@ -437,6 +497,9 @@ function PlayerBody({
         </Button>
         <Button variant="outline" className="rounded-xl" onClick={onReplace} disabled={busy}>
           <Upload className="size-4" /> Replace
+        </Button>
+        <Button variant="outline" className="rounded-xl" onClick={onDownload} disabled={busy}>
+          <Download className="size-4" /> Download
         </Button>
         <Button className="rounded-xl" onClick={() => onSave(caption)} disabled={busy}>
           Save
