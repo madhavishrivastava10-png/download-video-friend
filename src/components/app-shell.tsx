@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   Clock,
   Grid2x2,
+  Heart,
   Home,
   LayoutGrid,
   LogOut,
@@ -21,6 +22,7 @@ const mainLinks = [
   { to: "/dashboard", label: "Home", icon: Home },
   { to: "/create", label: "Create", icon: Plus },
   { to: "/designs", label: "Recent Designs", icon: Clock },
+  { to: "/favorites", label: "Favorites", icon: Heart },
 ] as const;
 
 const templateLinks = [
