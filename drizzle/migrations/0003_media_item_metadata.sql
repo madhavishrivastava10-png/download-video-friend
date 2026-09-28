@@ -1,0 +1,1 @@
+ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS title text, ADD COLUMN IF NOT EXISTS thumbnail_url text, ADD COLUMN IF NOT EXISTS content_type text, ADD COLUMN IF NOT EXISTS file_size bigint;

@@ -109,8 +109,10 @@ export type Database = {
       media_items: {
         Row: {
           caption: string | null
+          content_type: string | null
           created_at: string
           design_id: string
+          file_size: number | null
           id: string
           media_type: string
           media_url: string
@@ -118,12 +120,16 @@ export type Database = {
           position: number
           source_url: string | null
           storage_path: string | null
+          thumbnail_url: string | null
+          title: string | null
           user_id: string
         }
         Insert: {
           caption?: string | null
+          content_type?: string | null
           created_at?: string
           design_id: string
+          file_size?: number | null
           id?: string
           media_type?: string
           media_url: string
@@ -131,12 +137,16 @@ export type Database = {
           position?: number
           source_url?: string | null
           storage_path?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
           user_id: string
         }
         Update: {
           caption?: string | null
+          content_type?: string | null
           created_at?: string
           design_id?: string
+          file_size?: number | null
           id?: string
           media_type?: string
           media_url?: string
@@ -144,6 +154,8 @@ export type Database = {
           position?: number
           source_url?: string | null
           storage_path?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
           user_id?: string
         }
         Relationships: [
