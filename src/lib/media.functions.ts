@@ -10,7 +10,7 @@ const PAGE_HOSTS = [
   "fb.watch", "x.com", "twitter.com", "vimeo.com", "pinterest.com", "threads.net", "reddit.com",
 ];
 
-function isPageHost(hostname: string) {
+export function isPageHost(hostname: string) {
   const h = hostname.toLowerCase().replace(/^www\./, "");
   return PAGE_HOSTS.some((d) => h === d || h.endsWith("." + d));
 }
@@ -26,11 +26,70 @@ function isPrivateHost(hostname: string) {
 
 type Checked =
   | { ok: false; message: string }
-  | { ok: true; url: URL; res: Response; contentType: string; isVideo: boolean; size: number | null };
+  | { ok: true; url: URL; res: Response; contentType: string; isVideo: boolean; size: number | null; pageUrl?: URL };
 
-/** Validates a URL and opens it; only succeeds for real, public media files. */
-async function openMediaUrl(raw: string): Promise<Checked> {
+const RESTRICTED =
+  "Unable to import this URL. The media may be private, unavailable, unsupported, or restricted.";
+
+function decodeHtml(s: string) {
+  return s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
+}
+
+function metaContent(html: string, key: string): string | null {
+  const re = new RegExp(
+    `<meta[^>]+(?:property|name)=["']${key.replace(/:/g, "\\:")}["'][^>]*>`,
+    "i",
+  );
+  const tag = html.match(re)?.[0];
+  if (!tag) return null;
+  const c = tag.match(/content=["']([^"']+)["']/i)?.[1];
+  return c ? decodeHtml(c) : null;
+}
+
+/** Finds a publicly published media file on a web page (Open Graph / <video> tags). */
+function findMediaInPage(html: string, base: URL): string | null {
+  const candidates = [
+    metaContent(html, "og:video:secure_url"),
+    metaContent(html, "og:video:url"),
+    metaContent(html, "og:video"),
+    metaContent(html, "twitter:player:stream"),
+    html.match(/<video[^>]+src=["']([^"']+)["']/i)?.[1],
+    html.match(/<source[^>]+src=["']([^"']+)["'][^>]*type=["']video/i)?.[1],
+  ];
+  const ogType = metaContent(html, "og:type") ?? "";
+  if (!ogType.includes("video")) candidates.push(metaContent(html, "og:image:secure_url"), metaContent(html, "og:image"));
+  for (const c of candidates) {
+    if (!c) continue;
+    try {
+      const u = new URL(decodeHtml(c), base);
+      if (u.protocol === "https:" || u.protocol === "http:") return u.toString();
+    } catch { /* skip */ }
+  }
+  return null;
+}
+
+async function fetchUrl(url: URL): Promise<Response | null> {
+  try {
+    return await fetch(url.toString(), {
+      headers: {
+        "user-agent": "Mozilla/5.0 (compatible; ReelGrid/1.0; +https://lovable.app)",
+        accept: "video/*,image/*,text/html;q=0.8,*/*;q=0.5",
+      },
+      redirect: "follow",
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates a URL and opens the media behind it. Accepts direct media files or
+ * public web pages that openly publish their media (Open Graph / <video> tags).
+ * Never bypasses logins, private accounts or DRM.
+ */
+async function openMediaUrl(raw: string, depth = 0): Promise<Checked> {
   const fail = (message: string) => ({ ok: false as const, message });
+  if (!raw.trim()) return fail("Please paste a link first.");
   let url: URL;
   try {
     url = new URL(raw.trim());
@@ -39,35 +98,34 @@ async function openMediaUrl(raw: string): Promise<Checked> {
   }
   if (url.protocol !== "https:" && url.protocol !== "http:") return fail("Only http and https links are supported.");
   if (isPrivateHost(url.hostname)) return fail("Private or local network addresses are not allowed.");
-  if (isPageHost(url.hostname)) {
-    return fail(
-      "This is a social media page link (Instagram, YouTube, TikTok, Snapchat, etc.), not a media file. These platforms don't allow direct downloading, so it can't be imported. Paste a direct file link (e.g. ending in .mp4) or upload the file from your device.",
-    );
-  }
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), {
-      headers: { "user-agent": "ReelGrid/1.0", accept: "video/*,image/*;q=0.9,*/*;q=0.5" },
-      redirect: "follow",
-    });
-  } catch {
-    return fail("We could not reach that link. Check it and try again.");
-  }
-  if (res.status === 401 || res.status === 403) {
+
+  const res = await fetchUrl(url);
+  if (!res) return fail("Network error: we could not reach that link. Check it and try again.");
+  if (res.status === 401 || res.status === 403 || res.status === 404 || res.status === 410) {
     await res.body?.cancel();
-    return fail("That file is private or blocks outside access, so it can't be imported.");
+    return fail(RESTRICTED);
   }
   if (!res.ok || !res.body) {
     await res.body?.cancel();
-    return fail(`Could not fetch that link (status ${res.status}).`);
+    return fail(`${RESTRICTED} (status ${res.status})`);
   }
   const contentType = (res.headers.get("content-type") ?? "").toLowerCase().split(";")[0]!.trim();
   const isVideo = contentType.startsWith("video/");
   const isImage = contentType.startsWith("image/");
+
   if (!isVideo && !isImage) {
-    await res.body.cancel();
-    return fail("This link opens a web page, not a video or image file. Paste a direct media file link instead.");
+    if (depth > 0 || !contentType.includes("html")) {
+      await res.body.cancel();
+      return fail(RESTRICTED);
+    }
+    const html = (await res.text()).slice(0, 2_000_000);
+    const found = findMediaInPage(html, new URL(res.url || url.toString()));
+    if (!found) return fail(RESTRICTED);
+    const inner = await openMediaUrl(found, depth + 1);
+    if (!inner.ok) return inner;
+    return { ...inner, pageUrl: url };
   }
+
   const len = Number(res.headers.get("content-length"));
   const size = Number.isFinite(len) && len > 0 ? len : null;
   if (size && size > MAX_BYTES) {
@@ -100,6 +158,7 @@ export const checkMediaUrl = createServerFn({ method: "POST" })
       contentType: r.contentType,
       size: r.size,
       suggestedTitle: titleFromUrl(r.url),
+      platform: detectPlatform((r.pageUrl ?? r.url).hostname),
     };
   });
 
@@ -150,10 +209,10 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
         user_id: userId,
         position,
         media_type: r.isVideo ? "video" : "image",
-        platform: "upload",
+        platform: detectPlatform((r.pageUrl ?? r.url).hostname),
         storage_path: path,
         media_url: path,
-        source_url: r.url.toString(),
+        source_url: (r.pageUrl ?? r.url).toString(),
         caption: data.caption ?? null,
         title: data.title?.trim() || titleFromUrl(r.url),
         thumbnail_url: r.isVideo ? null : path,

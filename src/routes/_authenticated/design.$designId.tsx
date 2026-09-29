@@ -105,7 +105,10 @@ function GridEditor() {
   }
 
   async function handleUrlAdd() {
-    if (!url.trim()) return;
+    if (!url.trim()) {
+      toast.error("Please paste a link first.");
+      return;
+    }
     setBusy(true);
     try {
       const result = await importUrl({ data: { designId, url: url.trim(), position: items.length } });
@@ -118,7 +121,7 @@ function GridEditor() {
       setAddOpen(false);
       refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save that link.");
+      toast.error("Server error while importing. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -329,19 +332,20 @@ function GridEditor() {
               <Link2 className="size-4" /> Add media
             </DialogTitle>
             <DialogDescription>
-              Paste a direct video file link (ending in .mp4, .webm or .mov) or upload a file you own.
-              We store a real copy, so it keeps playing even if the original is deleted.
+              Paste a public video, reel or post link, or upload a file you own. We store a real copy,
+              so it keeps playing even if the original is deleted.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-2">
-            <Label htmlFor="media-url">Video file link</Label>
+            <Label htmlFor="media-url">Paste URL</Label>
             <div className="flex gap-2">
               <Input
                 id="media-url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="https://.../video.mp4"
+                placeholder="Paste a public video, reel or post URL..."
+                onKeyDown={(e) => { if (e.key === "Enter") handleUrlAdd(); }}
                 className="h-11 rounded-xl"
               />
               <Button onClick={handleUrlAdd} disabled={busy} className="h-11 rounded-xl">
