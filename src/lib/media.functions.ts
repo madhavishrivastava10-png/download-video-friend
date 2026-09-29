@@ -10,7 +10,7 @@ const PAGE_HOSTS = [
   "fb.watch", "x.com", "twitter.com", "vimeo.com", "pinterest.com", "threads.net", "reddit.com",
 ];
 
-function isPageHost(hostname: string) {
+export function isPageHost(hostname: string) {
   const h = hostname.toLowerCase().replace(/^www\./, "");
   return PAGE_HOSTS.some((d) => h === d || h.endsWith("." + d));
 }
@@ -26,7 +26,7 @@ function isPrivateHost(hostname: string) {
 
 type Checked =
   | { ok: false; message: string }
-  | { ok: true; url: URL; res: Response; contentType: string; isVideo: boolean; size: number | null };
+  | { ok: true; url: URL; res: Response; contentType: string; isVideo: boolean; size: number | null; pageUrl?: URL };
 
 const RESTRICTED =
   "Unable to import this URL. The media may be private, unavailable, unsupported, or restricted.";
@@ -158,6 +158,7 @@ export const checkMediaUrl = createServerFn({ method: "POST" })
       contentType: r.contentType,
       size: r.size,
       suggestedTitle: titleFromUrl(r.url),
+      platform: detectPlatform((r.pageUrl ?? r.url).hostname),
     };
   });
 
@@ -208,10 +209,10 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
         user_id: userId,
         position,
         media_type: r.isVideo ? "video" : "image",
-        platform: "upload",
+        platform: detectPlatform((r.pageUrl ?? r.url).hostname),
         storage_path: path,
         media_url: path,
-        source_url: r.url.toString(),
+        source_url: (r.pageUrl ?? r.url).toString(),
         caption: data.caption ?? null,
         title: data.title?.trim() || titleFromUrl(r.url),
         thumbnail_url: r.isVideo ? null : path,
