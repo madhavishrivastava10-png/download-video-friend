@@ -170,6 +170,18 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
     return { ok: true as const, item: row };
   });
 
+function guessExtension(contentType: string, path: string) {
+  const fromUrl = path.split(".").pop()?.toLowerCase();
+  if (fromUrl && fromUrl.length <= 4 && /^[a-z0-9]+$/.test(fromUrl) && fromUrl !== path.toLowerCase()) return fromUrl;
+  if (contentType.includes("mp4")) return "mp4";
+  if (contentType.includes("webm")) return "webm";
+  if (contentType.includes("quicktime")) return "mov";
+  if (contentType.includes("png")) return "png";
+  if (contentType.includes("gif")) return "gif";
+  if (contentType.includes("webp")) return "webp";
+  return contentType.startsWith("video/") ? "mp4" : "jpg";
+}
+
 function detectPlatform(hostname: string) {
   const h = hostname.toLowerCase();
   if (h.includes("instagram") || h.includes("cdninstagram")) return "instagram";
