@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { TEMPLATES } from "@/lib/reel-grid";
 import { Button } from "@/components/ui/button";
+import { MediaImporter } from "@/components/media-importer";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -39,6 +40,8 @@ function Dashboard() {
       <p className="mt-1 text-sm text-muted-foreground">
         Create, organise and share your favourite reels, videos and posts.
       </p>
+
+      <MediaImporter />
 
       <section className="card-soft mt-8 p-5 sm:p-6">
         <h2 className="font-display text-lg font-bold">Start a new grid</h2>
