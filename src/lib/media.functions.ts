@@ -70,7 +70,7 @@ function findMediaInPage(html: string, base: URL): string | null {
 
 async function fetchUrl(url: URL): Promise<Response | null> {
   try {
-    return await fetch(url.toString(), {
+    return await fetchWithBackoff(url.toString(), {
       headers: {
         "user-agent": "Mozilla/5.0 (compatible; ReelGrid/1.0; +https://lovable.app)",
         accept: "video/*,image/*,text/html;q=0.8,*/*;q=0.5",
@@ -81,6 +81,7 @@ async function fetchUrl(url: URL): Promise<Response | null> {
     return null;
   }
 }
+
 
 /**
  * Validates a URL and opens the media behind it. Accepts direct media files or
@@ -104,6 +105,14 @@ async function openMediaUrl(raw: string, depth = 0): Promise<Checked> {
   if (res.status === 401 || res.status === 403 || res.status === 404 || res.status === 410) {
     await res.body?.cancel();
     return fail(RESTRICTED);
+  }
+  if (res.status === 429) {
+    await res.body?.cancel();
+    return fail("That site is rate-limiting requests right now (429). Please wait a minute and try again.");
+  }
+  if (res.status >= 500) {
+    await res.body?.cancel();
+    return fail(`That site is temporarily unavailable (status ${res.status}). Please try again later.`);
   }
   if (!res.ok || !res.body) {
     await res.body?.cancel();
@@ -140,6 +149,79 @@ function titleFromUrl(url: URL) {
   return name.replace(/[-_]+/g, " ").trim().slice(0, 120) || "Imported media";
 }
 
+// ---------- YouTube (official oEmbed + embedded player; no downloading) ----------
+const YT_ID = /^[A-Za-z0-9_-]{11}$/;
+
+/** Extracts the video id from any common YouTube URL shape, or null. */
+export function parseYouTubeId(raw: string): string | null {
+  let u: URL;
+  try { u = new URL(raw.trim()); } catch { return null; }
+  const h = u.hostname.toLowerCase().replace(/^(www\.|m\.|music\.)/, "");
+  let id: string | null = null;
+  if (h === "youtu.be") id = u.pathname.split("/")[1] ?? null;
+  else if (h === "youtube.com" || h === "youtube-nocookie.com") {
+    if (u.pathname === "/watch") id = u.searchParams.get("v");
+    else {
+      const m = u.pathname.match(/^\/(shorts|embed|live|v)\/([^/?#]+)/);
+      id = m?.[2] ?? null;
+    }
+  }
+  return id && YT_ID.test(id) ? id : null;
+}
+
+type YouTubeInfo =
+  | { ok: false; message: string }
+  | { ok: true; id: string; watchUrl: string; embedUrl: string; title: string; thumbnail: string; author: string | null };
+
+const ytCache = new Map<string, { at: number; value: YouTubeInfo }>();
+
+async function fetchWithBackoff(url: string, init: RequestInit, tries = 3): Promise<Response | null> {
+  for (let i = 0; i < tries; i++) {
+    let res: Response;
+    try { res = await fetch(url, init); } catch { if (i === tries - 1) return null; await sleep(400 * 2 ** i); continue; }
+    if ((res.status === 429 || res.status >= 500) && i < tries - 1) {
+      await res.body?.cancel();
+      const ra = Number(res.headers.get("retry-after"));
+      await sleep(Number.isFinite(ra) && ra > 0 ? Math.min(ra, 5) * 1000 : 500 * 2 ** i);
+      continue;
+    }
+    return res;
+  }
+  return null;
+}
+function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+
+/** Verifies a YouTube video is public and embeddable via YouTube's official oEmbed endpoint. */
+async function resolveYouTube(id: string): Promise<YouTubeInfo> {
+  const hit = ytCache.get(id);
+  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.value;
+  const watchUrl = `https://www.youtube.com/watch?v=${id}`;
+  const res = await fetchWithBackoff(
+    `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(watchUrl)}`,
+    { headers: { accept: "application/json" } },
+  );
+  let value: YouTubeInfo;
+  if (!res) value = { ok: false, message: "Temporary network problem reaching YouTube. Please try again in a moment." };
+  else if (res.status === 429) value = { ok: false, message: "YouTube is rate-limiting requests right now (429). Please wait a minute and try again." };
+  else if (res.status === 401 || res.status === 403) value = { ok: false, message: "This YouTube video is private or its owner has disabled embedding, so it can't be added." };
+  else if (res.status === 404 || res.status === 400) value = { ok: false, message: "This YouTube video is unavailable or has been removed." };
+  else if (!res.ok) value = { ok: false, message: `YouTube is temporarily unavailable (status ${res.status}). Please try again.` };
+  else {
+    const j = (await res.json()) as { title?: string; author_name?: string; thumbnail_url?: string };
+    value = {
+      ok: true, id, watchUrl,
+      embedUrl: `https://www.youtube-nocookie.com/embed/${id}`,
+      title: (j.title ?? "YouTube video").slice(0, 200),
+      thumbnail: j.thumbnail_url ?? `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      author: j.author_name ?? null,
+    };
+  }
+  if (res) await res.body?.cancel().catch(() => {});
+  // Cache successes and hard failures; don't cache transient ones.
+  if (value.ok || (res && [401, 403, 404, 400].includes(res.status))) ytCache.set(id, { at: Date.now(), value });
+  return value;
+}
+
 /** Checks a link without saving anything; used for the preview step. */
 export const checkMediaUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -148,6 +230,15 @@ export const checkMediaUrl = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }) => {
+    const ytId = parseYouTubeId(data.url);
+    if (ytId) {
+      const y = await resolveYouTube(ytId);
+      if (!y.ok) return y;
+      return {
+        ok: true as const, url: y.embedUrl, mediaType: "embed" as const, contentType: "YouTube video",
+        size: null, suggestedTitle: y.title, platform: "youtube",
+      };
+    }
     const r = await openMediaUrl(data.url);
     if (!r.ok) return r;
     await r.res.body?.cancel();
@@ -180,13 +271,6 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
     const { data: design } = await supabase.from("designs").select("id").eq("id", data.designId).maybeSingle();
     if (!design) return fail("That grid was not found.");
 
-    const r = await openMediaUrl(data.url);
-    if (!r.ok) return r;
-
-    const buffer = new Uint8Array(await r.res.arrayBuffer());
-    if (buffer.byteLength === 0) return fail("That file is empty.");
-    if (buffer.byteLength > MAX_BYTES) return fail("That file is larger than 200 MB.");
-
     let position = data.position;
     if (position === undefined) {
       const { data: last } = await supabase
@@ -194,6 +278,28 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
         .order("position", { ascending: false }).limit(1).maybeSingle();
       position = last ? last.position + 1 : 0;
     }
+
+    const ytId = parseYouTubeId(data.url);
+    if (ytId) {
+      const y = await resolveYouTube(ytId);
+      if (!y.ok) return y;
+      const { data: row, error } = await supabase.from("media_items").insert({
+        design_id: data.designId, user_id: userId, position,
+        media_type: "embed", platform: "youtube", storage_path: null,
+        media_url: y.embedUrl, source_url: y.watchUrl, caption: data.caption ?? null,
+        title: data.title?.trim() || y.title, thumbnail_url: y.thumbnail, content_type: "video/youtube",
+      }).select().single();
+      if (error) return fail("Could not save to your grid. Please try again.");
+      await supabase.from("designs").update({ updated_at: new Date().toISOString() }).eq("id", data.designId);
+      return { ok: true as const, item: row };
+    }
+
+    const r = await openMediaUrl(data.url);
+    if (!r.ok) return r;
+
+    const buffer = new Uint8Array(await r.res.arrayBuffer());
+    if (buffer.byteLength === 0) return fail("That file is empty.");
+    if (buffer.byteLength > MAX_BYTES) return fail("That file is larger than 200 MB.");
 
     const ext = guessExtension(r.contentType, r.url.pathname);
     const path = `${userId}/${data.designId}/${crypto.randomUUID()}.${ext}`;

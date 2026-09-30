@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 
 type Preview = {
   url: string;
-  mediaType: "video" | "image";
+  mediaType: "video" | "image" | "embed";
   contentType: string;
   size: number | null;
   suggestedTitle: string;
@@ -131,7 +131,9 @@ export function MediaImporter() {
       {preview && (
         <div className="mt-4 grid gap-4 sm:grid-cols-[220px_1fr]">
           <div className="overflow-hidden rounded-xl bg-muted">
-            {preview.mediaType === "video" ? (
+            {preview.mediaType === "embed" ? (
+              <iframe src={preview.url} title="Preview" className="aspect-video w-full" allowFullScreen />
+            ) : preview.mediaType === "video" ? (
               <video src={preview.url} controls muted playsInline className="aspect-[9/16] w-full object-cover" />
             ) : (
               <img src={preview.url} alt="Preview" className="aspect-[9/16] w-full object-cover" />
@@ -139,7 +141,7 @@ export function MediaImporter() {
           </div>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              {preview.mediaType === "video" ? "Video" : "Image"} · {preview.contentType}
+              {preview.mediaType === "image" ? "Image" : "Video"} · {preview.contentType}
               {preview.size ? ` · ${(preview.size / 1024 / 1024).toFixed(1)} MB` : ""}
             </p>
             <label className="block text-sm font-semibold">
