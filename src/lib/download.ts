@@ -20,3 +20,6 @@ export function mediaFilename(caption: string | null | undefined, mediaType: str
     .slice(0, 40) || "reel-grid-media";
   return `${base}.${mediaType === "image" ? "jpg" : "mp4"}`;
 }
+
+export const EMBED_NO_DOWNLOAD =
+  "YouTube does not allow downloading its videos. This one plays in your grid through YouTube's official player.";
