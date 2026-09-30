@@ -1,3 +1,4 @@
+import { MediaView } from "@/components/media-view";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
@@ -89,11 +90,7 @@ function SharePage() {
               key={item.id}
               className="relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted"
             >
-              {item.media_type === "image" ? (
-                <img src={item.playback_url} alt={item.caption ?? "Media"} className="size-full object-cover" />
-              ) : (
-                <video src={`${item.playback_url}#t=0.1`} controls playsInline preload="metadata" className="size-full object-cover" />
-              )}
+              {item.media_type === "embed" ? <MediaView item={item} mode="player" /> : <MediaView item={item} mode="thumb" controls />}
               <span className="absolute left-2 top-2">
                 <PlatformBadge platform={item.platform} />
               </span>

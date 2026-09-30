@@ -1,3 +1,4 @@
+import { MediaView } from "@/components/media-view";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -5,7 +6,7 @@ import { toast } from "sonner";
 import { Download, Heart, Loader2, Play } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signMedia, type PlayableMedia } from "@/lib/reel-grid";
-import { downloadMedia, mediaFilename } from "@/lib/download";
+import { downloadMedia, mediaFilename, EMBED_NO_DOWNLOAD } from "@/lib/download";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -70,6 +71,7 @@ function FavoritesPage() {
   async function handleDownload(item: FavRow) {
     setDownloading(true);
     try {
+      if (item.media_type === "embed") throw new Error(EMBED_NO_DOWNLOAD);
       await downloadMedia(item.playback_url, mediaFilename(item.caption, item.media_type));
       toast.success("Download started");
     } catch (err) {
@@ -110,11 +112,7 @@ function FavoritesPage() {
               onClick={() => setActive(item)}
               className="group relative aspect-[3/4] overflow-hidden rounded-2xl border border-border bg-muted shadow-sm transition-transform hover:-translate-y-1"
             >
-              {item.media_type === "image" ? (
-                <img src={item.playback_url} alt={item.caption ?? "Media"} className="size-full object-cover" />
-              ) : (
-                <video src={`${item.playback_url}#t=0.1`} className="size-full object-cover" muted playsInline preload="metadata" />
-              )}
+              <MediaView item={item} mode="thumb" />
               <span className="absolute left-2 top-2">
                 <PlatformBadge platform={item.platform} />
               </span>
@@ -145,11 +143,7 @@ function FavoritesPage() {
           {active && (
             <div className="space-y-4">
               <div className="overflow-hidden rounded-xl bg-foreground/90">
-                {active.media_type === "image" ? (
-                  <img src={active.playback_url} alt={active.caption ?? "Media"} className="max-h-80 w-full object-contain" />
-                ) : (
-                  <video src={active.playback_url} controls className="max-h-80 w-full" />
-                )}
+                <MediaView item={active} mode="player" />
               </div>
               {active.caption && <p className="text-sm text-muted-foreground">{active.caption}</p>}
               <div className="flex flex-wrap justify-end gap-2">
