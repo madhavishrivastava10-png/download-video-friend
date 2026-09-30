@@ -117,7 +117,9 @@ function GridEditor() {
         toast.error(result.message);
         return;
       }
-      toast.success("Saved — a permanent copy is now stored in your grid.");
+      toast.success(result.item.media_type === "embed"
+        ? "Added — plays through YouTube's official player."
+        : "Saved — a permanent copy is now stored in your grid.");
       setUrl("");
       setAddOpen(false);
       refresh();
