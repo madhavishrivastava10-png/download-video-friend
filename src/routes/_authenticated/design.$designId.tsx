@@ -118,7 +118,7 @@ function GridEditor() {
         return;
       }
       toast.success(result.item.media_type === "embed"
-        ? "Added — plays through YouTube's official player."
+        ? "Added — plays through the platform's official player."
         : "Saved — a permanent copy is now stored in your grid.");
       setUrl("");
       setAddOpen(false);

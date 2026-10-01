@@ -132,7 +132,7 @@ export function MediaImporter() {
         <div className="mt-4 grid gap-4 sm:grid-cols-[220px_1fr]">
           <div className="overflow-hidden rounded-xl bg-muted">
             {preview.mediaType === "embed" ? (
-              <iframe src={preview.url} title="Preview" className="aspect-video w-full" allowFullScreen />
+              <iframe src={preview.url} title="Preview" className={preview.url.includes("instagram.com") ? "h-[560px] w-full" : "aspect-video w-full"} allowFullScreen />
             ) : preview.mediaType === "video" ? (
               <video src={preview.url} controls muted playsInline className="aspect-[9/16] w-full object-cover" />
             ) : (
