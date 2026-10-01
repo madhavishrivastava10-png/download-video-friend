@@ -345,11 +345,15 @@ export const checkMediaUrl = createServerFn({ method: "POST" })
     }
     const ig = parseInstagram(data.url);
     if (ig) {
-      const i = await resolveInstagram(ig);
-      if (!i.ok) return i;
+      const meta = await fetchInstagramMeta(ig);
+      if (meta.status === "gone") return { ok: false as const, message: IG_GONE };
+      if (meta.status === "blocked") return { ok: false as const, message: IG_BLOCKED };
       return {
-        ok: true as const, url: i.embedUrl, mediaType: "embed" as const, contentType: "Instagram Reel",
-        size: null, suggestedTitle: i.title, platform: "instagram",
+        ok: true as const, url: instagramUrls(ig).embedUrl, mediaType: "embed" as const, contentType: "Instagram Reel",
+        size: null, suggestedTitle: ig.kind === "p" ? "Instagram post" : "Instagram Reel", platform: "instagram",
+        note: meta.status === "unavailable"
+          ? "Instagram didn't share the cover picture right now. It will be saved as a link card that plays through Instagram — you can retry the cover later."
+          : undefined,
       };
     }
     if (/(^|\.)instagram\.com$/i.test((() => { try { return new URL(data.url.trim()).hostname; } catch { return ""; } })())) {
@@ -412,17 +416,23 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
 
     const ig = parseInstagram(data.url);
     if (ig) {
-      const i = await resolveInstagram(ig);
-      if (!i.ok) return i;
+      // Never downloads the Reel. At most one cached metadata request; if
+      // Instagram is busy we still save the link and show a clean card.
+      const meta = await fetchInstagramMeta(ig);
+      if (meta.status === "gone") return fail(IG_GONE);
+      if (meta.status === "blocked") return fail(IG_BLOCKED);
+      const { watchUrl, embedUrl } = instagramUrls(ig);
       const { data: row, error } = await supabase.from("media_items").insert({
         design_id: data.designId, user_id: userId, position,
         media_type: "embed", platform: "instagram", storage_path: null,
-        media_url: i.embedUrl, source_url: i.watchUrl, caption: data.caption ?? null,
-        title: data.title?.trim() || i.title, thumbnail_url: i.thumbnail, content_type: "video/instagram",
+        media_url: embedUrl, source_url: watchUrl, caption: data.caption ?? null,
+        title: data.title?.trim() || (ig.kind === "p" ? "Instagram post" : "Instagram Reel"),
+        thumbnail_url: meta.status === "ok" ? meta.thumbnail : null,
+        content_type: "video/instagram",
       }).select().single();
       if (error) return fail("Could not save to your grid. Please try again.");
       await supabase.from("designs").update({ updated_at: new Date().toISOString() }).eq("id", data.designId);
-      return { ok: true as const, item: row };
+      return { ok: true as const, item: row, metadataPending: meta.status === "unavailable" };
     }
 
     const r = await openMediaUrl(data.url);
