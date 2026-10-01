@@ -10,9 +10,12 @@ type ViewItem = {
 export function MediaView({ item, mode, controls }: { item: ViewItem; mode: "thumb" | "player"; controls?: boolean }) {
   const alt = item.caption ?? item.title ?? "Media";
   if (item.media_type === "embed") {
+    const isIg = item.playback_url.includes("instagram.com");
     if (mode === "thumb") {
       return item.thumbnail_url ? (
-        <img src={item.thumbnail_url} alt={alt} className="size-full object-cover" loading="lazy" />
+        <img src={item.thumbnail_url} alt={alt} className="size-full object-cover" loading="lazy" referrerPolicy="no-referrer" />
+      ) : isIg ? (
+        <div className="brand-gradient grid size-full place-items-center text-xs font-semibold text-primary-foreground">Instagram Reel</div>
       ) : (
         <div className="size-full bg-muted" />
       );
@@ -21,7 +24,7 @@ export function MediaView({ item, mode, controls }: { item: ViewItem; mode: "thu
       <iframe
         src={item.playback_url}
         title={alt}
-        className="aspect-video w-full"
+        className={isIg ? "h-[70vh] max-h-[640px] w-full" : "aspect-video w-full"}
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
         allowFullScreen
       />
