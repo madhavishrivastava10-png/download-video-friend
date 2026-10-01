@@ -237,47 +237,92 @@ export function parseInstagram(raw: string): { kind: "reel" | "p" | "tv"; code: 
   return { kind, code: m[2]! };
 }
 
-type InstagramInfo =
-  | { ok: false; message: string }
-  | { ok: true; watchUrl: string; embedUrl: string; title: string; thumbnail: string | null };
+/** Canonical, tracking-free Instagram links for a parsed post. */
+function instagramUrls(p: { kind: string; code: string }) {
+  return {
+    watchUrl: `https://www.instagram.com/${p.kind}/${p.code}/`,
+    embedUrl: `https://www.instagram.com/${p.kind}/${p.code}/embed/`,
+  };
+}
 
-const igCache = new Map<string, { at: number; value: InstagramInfo }>();
+/**
+ * Result of the optional cover/metadata lookup. Only "gone" and "blocked" stop
+ * an import; "unavailable" (rate limit, network, Instagram refusing servers)
+ * still saves the Reel as a link card that plays through Instagram's player.
+ */
+type IgMeta =
+  | { status: "ok"; thumbnail: string | null }
+  | { status: "gone" }
+  | { status: "blocked" }
+  | { status: "unavailable"; retryAfterSec: number };
 
-/** Checks the official Instagram embed page; reports clear errors for missing/private/restricted posts. */
-async function resolveInstagram(p: { kind: string; code: string }): Promise<InstagramInfo> {
+const igCache = new Map<string, { until: number; value: IgMeta }>();
+/** Global pause after Instagram answers 429, so we never hammer it. */
+let igCooldownUntil = 0;
+
+const IG_GONE = "This Instagram Reel is unavailable or has been deleted.";
+const IG_BLOCKED = "This Instagram Reel can't be embedded — the account may be private, or the owner turned off embedding.";
+
+/**
+ * One single request to Instagram's official embed page (no retries, short
+ * timeout). Results are cached so preview + save never ask twice.
+ */
+async function fetchInstagramMeta(p: { kind: string; code: string }): Promise<IgMeta> {
   const key = `${p.kind}/${p.code}`;
+  const now = Date.now();
   const hit = igCache.get(key);
-  if (hit && Date.now() - hit.at < 10 * 60_000) return hit.value;
-  const watchUrl = `https://www.instagram.com/${p.kind}/${p.code}/`;
-  const embedUrl = `https://www.instagram.com/${p.kind}/${p.code}/embed/`;
-  const res = await fetchWithBackoff(embedUrl, {
-    headers: { "user-agent": "Mozilla/5.0 (compatible; ReelGrid/1.0)", accept: "text/html" },
-  });
-  let value: InstagramInfo;
-  let cacheable = false;
-  if (!res) value = { ok: false, message: "Instagram is temporarily unavailable. Please try again in a moment." };
-  else if (res.status === 404 || res.status === 410) {
-    value = { ok: false, message: "This Instagram Reel is unavailable or has been deleted." }; cacheable = true;
-  } else if (res.status === 429) value = { ok: false, message: "Instagram is rate-limiting requests right now. Please wait a minute and try again." };
-  else if (res.status >= 500) value = { ok: false, message: "Instagram is temporarily unavailable. Please try again later." };
-  else {
-    let thumbnail: string | null = null;
-    let blocked = false;
-    if (res.ok) {
-      const html = (await res.text()).slice(0, 1_000_000);
-      const img = html.match(/class="EmbeddedMediaImage"[^>]*src="([^"]+)"/i)?.[1] ?? html.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^"]+)"/i)?.[1];
-      if (img) thumbnail = decodeHtml(img);
-      if (/This (post|reel|content) is(n't| not) available|private account|Sorry, this page isn/i.test(html) && !img) blocked = true;
-    } else await res.body?.cancel().catch(() => {});
-    if (blocked) {
-      value = { ok: false, message: "This Instagram Reel can't be embedded — the account may be private, or embedding is disabled." };
-      cacheable = true;
-    } else {
-      value = { ok: true, watchUrl, embedUrl, title: p.kind === "p" ? "Instagram post" : "Instagram Reel", thumbnail };
-      cacheable = true;
+  if (hit && now < hit.until) {
+    if (hit.value.status === "unavailable") {
+      return { status: "unavailable", retryAfterSec: Math.max(1, Math.ceil((hit.until - now) / 1000)) };
     }
+    return hit.value;
   }
-  if (cacheable) igCache.set(key, { at: Date.now(), value });
+  if (now < igCooldownUntil) {
+    return { status: "unavailable", retryAfterSec: Math.ceil((igCooldownUntil - now) / 1000) };
+  }
+
+  const { embedUrl } = instagramUrls(p);
+  let res: Response | null = null;
+  try {
+    res = await fetch(embedUrl, {
+      headers: { "user-agent": "Mozilla/5.0 (compatible; ReelGrid/1.0)", accept: "text/html" },
+      signal: AbortSignal.timeout(6000),
+    });
+  } catch {
+    res = null;
+  }
+
+  let value: IgMeta;
+  let ttlMs: number;
+  if (!res) {
+    value = { status: "unavailable", retryAfterSec: 30 };
+    ttlMs = 30_000;
+  } else if (res.status === 429) {
+    const ra = Number(res.headers.get("retry-after"));
+    const sec = Number.isFinite(ra) && ra > 0 ? Math.min(Math.max(ra, 60), 900) : 120;
+    igCooldownUntil = now + sec * 1000;
+    value = { status: "unavailable", retryAfterSec: sec };
+    ttlMs = sec * 1000;
+  } else if (res.status === 404 || res.status === 410) {
+    value = { status: "gone" };
+    ttlMs = 30 * 60_000;
+  } else if (!res.ok) {
+    value = { status: "unavailable", retryAfterSec: 60 };
+    ttlMs = 60_000;
+  } else {
+    const html = (await res.text()).slice(0, 1_000_000);
+    const img =
+      html.match(/class="EmbeddedMediaImage"[^>]*src="([^"]+)"/i)?.[1] ??
+      html.match(/<img[^>]+class="[^"]*EmbeddedMediaImage[^"]*"[^>]+src="([^"]+)"/i)?.[1];
+    if (!img && /This (post|reel|content) is(n't| not) available|private account|Sorry, this page isn/i.test(html)) {
+      value = { status: "blocked" };
+    } else {
+      value = { status: "ok", thumbnail: img ? decodeHtml(img) : null };
+    }
+    ttlMs = 30 * 60_000;
+  }
+  if (res && !res.bodyUsed) await res.body?.cancel().catch(() => {});
+  igCache.set(key, { until: now + ttlMs, value });
   return value;
 }
 
@@ -300,11 +345,15 @@ export const checkMediaUrl = createServerFn({ method: "POST" })
     }
     const ig = parseInstagram(data.url);
     if (ig) {
-      const i = await resolveInstagram(ig);
-      if (!i.ok) return i;
+      const meta = await fetchInstagramMeta(ig);
+      if (meta.status === "gone") return { ok: false as const, message: IG_GONE };
+      if (meta.status === "blocked") return { ok: false as const, message: IG_BLOCKED };
       return {
-        ok: true as const, url: i.embedUrl, mediaType: "embed" as const, contentType: "Instagram Reel",
-        size: null, suggestedTitle: i.title, platform: "instagram",
+        ok: true as const, url: instagramUrls(ig).embedUrl, mediaType: "embed" as const, contentType: "Instagram Reel",
+        size: null, suggestedTitle: ig.kind === "p" ? "Instagram post" : "Instagram Reel", platform: "instagram",
+        note: meta.status === "unavailable"
+          ? "Instagram didn't share the cover picture right now. It will be saved as a link card that plays through Instagram — you can retry the cover later."
+          : undefined,
       };
     }
     if (/(^|\.)instagram\.com$/i.test((() => { try { return new URL(data.url.trim()).hostname; } catch { return ""; } })())) {
@@ -367,17 +416,23 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
 
     const ig = parseInstagram(data.url);
     if (ig) {
-      const i = await resolveInstagram(ig);
-      if (!i.ok) return i;
+      // Never downloads the Reel. At most one cached metadata request; if
+      // Instagram is busy we still save the link and show a clean card.
+      const meta = await fetchInstagramMeta(ig);
+      if (meta.status === "gone") return fail(IG_GONE);
+      if (meta.status === "blocked") return fail(IG_BLOCKED);
+      const { watchUrl, embedUrl } = instagramUrls(ig);
       const { data: row, error } = await supabase.from("media_items").insert({
         design_id: data.designId, user_id: userId, position,
         media_type: "embed", platform: "instagram", storage_path: null,
-        media_url: i.embedUrl, source_url: i.watchUrl, caption: data.caption ?? null,
-        title: data.title?.trim() || i.title, thumbnail_url: i.thumbnail, content_type: "video/instagram",
+        media_url: embedUrl, source_url: watchUrl, caption: data.caption ?? null,
+        title: data.title?.trim() || (ig.kind === "p" ? "Instagram post" : "Instagram Reel"),
+        thumbnail_url: meta.status === "ok" ? meta.thumbnail : null,
+        content_type: "video/instagram",
       }).select().single();
       if (error) return fail("Could not save to your grid. Please try again.");
       await supabase.from("designs").update({ updated_at: new Date().toISOString() }).eq("id", data.designId);
-      return { ok: true as const, item: row };
+      return { ok: true as const, item: row, metadataPending: meta.status === "unavailable" };
     }
 
     const r = await openMediaUrl(data.url);
