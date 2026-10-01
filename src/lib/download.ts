@@ -22,4 +22,4 @@ export function mediaFilename(caption: string | null | undefined, mediaType: str
 }
 
 export const EMBED_NO_DOWNLOAD =
-  "YouTube does not allow downloading its videos. This one plays in your grid through YouTube's official player.";
+  "YouTube and Instagram don't allow downloading their videos. This one plays in your grid through the platform's official player.";
