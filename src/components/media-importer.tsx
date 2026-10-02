@@ -15,6 +15,7 @@ type Preview = {
   contentType: string;
   size: number | null;
   suggestedTitle: string;
+  note?: string | undefined;
 };
 
 export function MediaImporter() {
@@ -27,7 +28,7 @@ export function MediaImporter() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "checking" | "saving">("idle");
-  const [saved, setSaved] = useState<{ designId: string; title: string } | null>(null);
+  const [saved, setSaved] = useState<{ designId: string; title: string; linkOnly: boolean } | null>(null);
 
   const { data: designs } = useQuery({
     queryKey: ["designs", "all-min"],
@@ -76,10 +77,10 @@ export function MediaImporter() {
         setError(r.message);
         return;
       }
-      setSaved({ designId: target, title: r.item.title ?? "Media" });
+      setSaved({ designId: target, title: r.item.title ?? "Media", linkOnly: r.item.media_type === "embed" });
       setPreview(null);
       setUrl("");
-      toast.success("Saved to your grid");
+      toast.success(r.item.media_type === "embed" ? "Link added to your grid" : "Saved to your grid");
       qc.invalidateQueries({ queryKey: ["media", target] });
       qc.invalidateQueries({ queryKey: ["designs"] });
     } catch {
@@ -121,7 +122,7 @@ export function MediaImporter() {
       {saved && (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm">
           <CheckCircle2 className="size-4 text-primary" />
-          <span>"{saved.title}" was downloaded and saved.</span>
+          <span>{saved.linkOnly ? `"${saved.title}" was added as a link — it plays through the official player and is not downloaded.` : `"${saved.title}" was downloaded and saved.`}</span>
           <Link to="/design/$designId" params={{ designId: saved.designId }} className="font-semibold text-primary underline">
             Open grid
           </Link>
@@ -132,7 +133,7 @@ export function MediaImporter() {
         <div className="mt-4 grid gap-4 sm:grid-cols-[220px_1fr]">
           <div className="overflow-hidden rounded-xl bg-muted">
             {preview.mediaType === "embed" ? (
-              <iframe src={preview.url} title="Preview" className={preview.url.includes("instagram.com") ? "h-[560px] w-full" : "aspect-video w-full"} allowFullScreen />
+              <iframe src={preview.url} title="Preview" className={preview.url.includes("instagram.com") ? "aspect-[9/16] w-full" : "aspect-video w-full"} allowFullScreen />
             ) : preview.mediaType === "video" ? (
               <video src={preview.url} controls muted playsInline className="aspect-[9/16] w-full object-cover" />
             ) : (
@@ -144,6 +145,12 @@ export function MediaImporter() {
               {preview.mediaType === "image" ? "Image" : "Video"} · {preview.contentType}
               {preview.size ? ` · ${(preview.size / 1024 / 1024).toFixed(1)} MB` : ""}
             </p>
+            {preview.url.includes("instagram.com") && (
+              <p className="text-xs text-muted-foreground">
+                Instagram Reels are saved as a link and play through Instagram — the video is not downloaded.
+              </p>
+            )}
+            {preview.note && <p className="text-xs text-muted-foreground">{preview.note}</p>}
             <label className="block text-sm font-semibold">
               Title
               <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 rounded-xl" />

@@ -476,6 +476,39 @@ export const importMediaFromUrl = createServerFn({ method: "POST" })
     return { ok: true as const, item: row };
   });
 
+/**
+ * Retries the Instagram cover lookup for a saved Reel. Respects the global
+ * cooldown, so repeated clicks never turn into repeated requests.
+ */
+export const refreshInstagramCover = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { itemId: string }) => {
+    if (typeof input?.itemId !== "string" || input.itemId.length > 64) throw new Error("Invalid item");
+    return input;
+  })
+  .handler(async ({ data, context }) => {
+    const { supabase } = context;
+    const { data: item } = await supabase
+      .from("media_items").select("id, platform, source_url, media_url").eq("id", data.itemId).maybeSingle();
+    if (!item || item.platform !== "instagram") return { ok: false as const, message: "That Instagram item was not found." };
+    const ig = parseInstagram(item.source_url ?? item.media_url.replace(/\/embed\/?$/, "/"));
+    if (!ig) return { ok: false as const, message: "This item has no valid Instagram link." };
+    const meta = await fetchInstagramMeta(ig);
+    if (meta.status === "gone") return { ok: false as const, message: IG_GONE };
+    if (meta.status === "blocked") return { ok: false as const, message: IG_BLOCKED };
+    if (meta.status === "unavailable") {
+      return {
+        ok: false as const,
+        message: `Instagram is busy right now. Please try again in about ${meta.retryAfterSec} seconds.`,
+        retryAfterSec: meta.retryAfterSec,
+      };
+    }
+    if (!meta.thumbnail) return { ok: false as const, message: "Instagram didn't provide a cover picture for this Reel. It still plays normally." };
+    const { error } = await supabase.from("media_items").update({ thumbnail_url: meta.thumbnail }).eq("id", item.id);
+    if (error) return { ok: false as const, message: "Could not save the cover. Please try again." };
+    return { ok: true as const, thumbnail: meta.thumbnail };
+  });
+
 function guessExtension(contentType: string, path: string) {
   const fromUrl = path.split(".").pop()?.toLowerCase();
   if (fromUrl && fromUrl.length <= 4 && /^[a-z0-9]+$/.test(fromUrl) && fromUrl !== path.toLowerCase()) return fromUrl;

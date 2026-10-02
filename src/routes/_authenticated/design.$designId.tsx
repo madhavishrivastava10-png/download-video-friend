@@ -1,4 +1,5 @@
 import { MediaView } from "@/components/media-view";
+import { InstagramCoverRetry } from "@/components/instagram-cover-retry";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -117,9 +118,15 @@ function GridEditor() {
         toast.error(result.message);
         return;
       }
-      toast.success(result.item.media_type === "embed"
-        ? "Added — plays through the platform's official player."
-        : "Saved — a permanent copy is now stored in your grid.");
+      toast.success(
+        result.item.platform === "instagram" && result.item.media_type === "embed"
+          ? "metadataPending" in result && result.metadataPending
+            ? "Instagram Reel link saved — plays through Instagram (not downloaded). Cover picture can be retried later."
+            : "Instagram Reel link saved — plays through Instagram (not downloaded)."
+          : result.item.media_type === "embed"
+            ? "Added — plays through the platform's official player."
+            : "Saved — a permanent copy is now stored in your grid.",
+      );
       setUrl("");
       setAddOpen(false);
       refresh();
@@ -257,7 +264,7 @@ function GridEditor() {
             {design?.title ?? "Loading..."}
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {items.length} item{items.length === 1 ? "" : "s"} · saved permanently in your storage
+            {items.length} item{items.length === 1 ? "" : "s"} · saved in your grid
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
@@ -332,8 +339,8 @@ function GridEditor() {
               <Link2 className="size-4" /> Add media
             </DialogTitle>
             <DialogDescription>
-              Paste a public video, reel or post link, or upload a file you own. We store a real copy,
-              so it keeps playing even if the original is deleted.
+              Paste a public video, reel or post link, or upload a file you own. Direct files and uploads are
+              stored as a real copy. YouTube and Instagram links play through their official player and are not downloaded.
             </DialogDescription>
           </DialogHeader>
 
@@ -395,6 +402,7 @@ function GridEditor() {
               onReplace={() => replaceRef.current?.click()}
               onDownload={() => handleDownload(active)}
               onSave={(caption) => saveCaption(active, caption)}
+              onCoverUpdated={refresh}
             />
           )}
           <input
@@ -470,6 +478,7 @@ function PlayerBody({
   onReplace,
   onDownload,
   onSave,
+  onCoverUpdated,
 }: {
   item: PlayableMedia;
   busy: boolean;
@@ -477,13 +486,18 @@ function PlayerBody({
   onReplace: () => void;
   onDownload: () => void;
   onSave: (caption: string) => void;
+  onCoverUpdated?: () => void;
 }) {
   const [caption, setCaption] = useState(item.caption ?? "");
+  const isIg = item.media_type === "embed" && item.platform === "instagram";
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-xl bg-foreground/90">
+      <div className={isIg ? "overflow-hidden rounded-xl" : "overflow-hidden rounded-xl bg-foreground/90"}>
         <MediaView item={item} mode="player" />
       </div>
+      {isIg && !item.thumbnail_url && onCoverUpdated && (
+        <InstagramCoverRetry itemId={item.id} onDone={onCoverUpdated} />
+      )}
       <Textarea
         value={caption}
         maxLength={500}
