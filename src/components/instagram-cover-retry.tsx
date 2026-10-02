@@ -14,6 +14,7 @@ export function InstagramCoverRetry({ itemId, onDone }: { itemId: string; onDone
   const [busy, setBusy] = useState<boolean>(false);
   const [message, setMessage] = useState<string | null>(null);
   const pending = useRef(false);
+  const [done, setDone] = useState<boolean>(false);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -30,6 +31,7 @@ export function InstagramCoverRetry({ itemId, onDone }: { itemId: string; onDone
         if (r.ok) {
           setMessage(null);
           toast.success("Cover picture added.");
+          setDone(true);
           onDone();
           return;
         }
@@ -48,6 +50,7 @@ export function InstagramCoverRetry({ itemId, onDone }: { itemId: string; onDone
   }
 
   const waiting = countdown > 0;
+  if (done) return null;
   return (
     <div className="flex flex-col gap-1 rounded-xl border border-border bg-muted/40 p-3 text-xs">
       <span className="text-muted-foreground">

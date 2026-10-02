@@ -15,6 +15,7 @@ type Preview = {
   contentType: string;
   size: number | null;
   suggestedTitle: string;
+  note?: string;
 };
 
 export function MediaImporter() {
@@ -132,7 +133,7 @@ export function MediaImporter() {
         <div className="mt-4 grid gap-4 sm:grid-cols-[220px_1fr]">
           <div className="overflow-hidden rounded-xl bg-muted">
             {preview.mediaType === "embed" ? (
-              <iframe src={preview.url} title="Preview" className={preview.url.includes("instagram.com") ? "h-[560px] w-full" : "aspect-video w-full"} allowFullScreen />
+              <iframe src={preview.url} title="Preview" className={preview.url.includes("instagram.com") ? "aspect-[9/16] w-full" : "aspect-video w-full"} allowFullScreen />
             ) : preview.mediaType === "video" ? (
               <video src={preview.url} controls muted playsInline className="aspect-[9/16] w-full object-cover" />
             ) : (
@@ -144,6 +145,12 @@ export function MediaImporter() {
               {preview.mediaType === "image" ? "Image" : "Video"} · {preview.contentType}
               {preview.size ? ` · ${(preview.size / 1024 / 1024).toFixed(1)} MB` : ""}
             </p>
+            {preview.url.includes("instagram.com") && (
+              <p className="text-xs text-muted-foreground">
+                Instagram Reels are saved as a link and play through Instagram — the video is not downloaded.
+              </p>
+            )}
+            {preview.note && <p className="text-xs text-muted-foreground">{preview.note}</p>}
             <label className="block text-sm font-semibold">
               Title
               <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1 rounded-xl" />
