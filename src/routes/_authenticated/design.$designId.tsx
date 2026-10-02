@@ -339,8 +339,8 @@ function GridEditor() {
               <Link2 className="size-4" /> Add media
             </DialogTitle>
             <DialogDescription>
-              Paste a public video, reel or post link, or upload a file you own. We store a real copy,
-              so it keeps playing even if the original is deleted.
+              Paste a public video, reel or post link, or upload a file you own. Direct files and uploads are
+              stored as a real copy. YouTube and Instagram links play through their official player and are not downloaded.
             </DialogDescription>
           </DialogHeader>
 
