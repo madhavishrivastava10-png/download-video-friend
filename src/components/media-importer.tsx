@@ -28,7 +28,7 @@ export function MediaImporter() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "checking" | "saving">("idle");
-  const [saved, setSaved] = useState<{ designId: string; title: string } | null>(null);
+  const [saved, setSaved] = useState<{ designId: string; title: string; linkOnly: boolean } | null>(null);
 
   const { data: designs } = useQuery({
     queryKey: ["designs", "all-min"],
@@ -77,10 +77,10 @@ export function MediaImporter() {
         setError(r.message);
         return;
       }
-      setSaved({ designId: target, title: r.item.title ?? "Media" });
+      setSaved({ designId: target, title: r.item.title ?? "Media", linkOnly: r.item.media_type === "embed" });
       setPreview(null);
       setUrl("");
-      toast.success("Saved to your grid");
+      toast.success(r.item.media_type === "embed" ? "Link added to your grid" : "Saved to your grid");
       qc.invalidateQueries({ queryKey: ["media", target] });
       qc.invalidateQueries({ queryKey: ["designs"] });
     } catch {
@@ -122,7 +122,7 @@ export function MediaImporter() {
       {saved && (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/10 p-3 text-sm">
           <CheckCircle2 className="size-4 text-primary" />
-          <span>"{saved.title}" was downloaded and saved.</span>
+          <span>{saved.linkOnly ? `"${saved.title}" was added as a link — it plays through the official player and is not downloaded.` : `"${saved.title}" was downloaded and saved.`}</span>
           <Link to="/design/$designId" params={{ designId: saved.designId }} className="font-semibold text-primary underline">
             Open grid
           </Link>
