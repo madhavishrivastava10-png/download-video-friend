@@ -15,7 +15,7 @@ type Preview = {
   contentType: string;
   size: number | null;
   suggestedTitle: string;
-  note?: string;
+  note?: string | undefined;
 };
 
 export function MediaImporter() {
