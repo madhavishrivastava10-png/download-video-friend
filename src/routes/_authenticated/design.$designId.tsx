@@ -264,7 +264,7 @@ function GridEditor() {
             {design?.title ?? "Loading..."}
           </h1>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {items.length} item{items.length === 1 ? "" : "s"} · saved permanently in your storage
+            {items.length} item{items.length === 1 ? "" : "s"} · saved in your grid
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
