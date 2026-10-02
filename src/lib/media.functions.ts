@@ -284,7 +284,7 @@ async function fetchInstagramMeta(p: { kind: string; code: string }): Promise<Ig
   const { embedUrl } = instagramUrls(p);
   let res: Response | null = null;
   try {
-    res = await fetch(process.env["IG_TEST_URL"] ?? embedUrl, { // TEMP_TEST
+    res = await fetch(("https://httpbin.org/status/429" as string) || embedUrl, { // TEMP_TEST
       headers: { "user-agent": "Mozilla/5.0 (compatible; ReelGrid/1.0)", accept: "text/html" },
       signal: AbortSignal.timeout(6000),
     });
