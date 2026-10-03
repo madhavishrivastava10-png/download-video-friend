@@ -241,7 +241,7 @@ export function parseInstagram(raw: string): { kind: "reel" | "p" | "tv"; code: 
 function instagramUrls(p: { kind: string; code: string }) {
   return {
     watchUrl: `https://www.instagram.com/${p.kind}/${p.code}/`,
-    embedUrl: `https://www.instagram.com/${p.kind}/${p.code}/embed/`,
+    embedUrl: `https://www.instagram.com/p/${p.code}/embed/captioned/`,
   };
 }
 
