@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ExternalLink, Instagram, Loader2, Play } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Instagram, Loader2, Play, RotateCcw } from "lucide-react";
 
 type ViewItem = {
   media_type: string;
@@ -10,10 +10,6 @@ type ViewItem = {
   source_url?: string | null;
 };
 
-function instagramLink(item: ViewItem) {
-  return item.source_url || item.playback_url.replace(/\/embed(\/captioned)?\/?$/, "/");
-}
-
 /** Builds Instagram's official embed URL (same one their embed.js uses) from any saved Reel/post link. */
 function instagramEmbedUrl(item: ViewItem) {
   const src = item.source_url || item.playback_url;
@@ -21,31 +17,62 @@ function instagramEmbedUrl(item: ViewItem) {
   return m ? `https://www.instagram.com/p/${m[1]}/embed/captioned/` : item.playback_url;
 }
 
-function InstagramFallback({ item }: { item: ViewItem }) {
+function instagramCover(item: ViewItem) {
+  if (item.thumbnail_url) return item.thumbnail_url;
+  if (item.media_type === "image") return item.playback_url;
+  return null;
+}
+
+/** In-app message only — never links to or opens Instagram. */
+function InstagramFallback({ item, onRetry }: { item: ViewItem; onRetry: () => void }) {
+  const cover = instagramCover(item);
   return (
-    <div className="flex flex-col items-center gap-3 p-6 text-center">
-      <Instagram className="size-8 text-primary" />
-      <p className="max-w-xs text-sm font-medium">This Instagram Reel can't be played here. Open it on Instagram.</p>
-      <a
-        href={instagramLink(item)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+    <div className="flex flex-col items-center gap-3 p-4 text-center">
+      <div className="relative aspect-[9/16] w-full max-w-[min(240px,calc((50vh)*9/16))] overflow-hidden rounded-2xl border border-border bg-muted">
+        {cover ? (
+          <img src={cover} alt="" className="size-full object-cover" referrerPolicy="no-referrer" />
+        ) : (
+          <div className="brand-gradient grid size-full place-items-center text-primary-foreground">
+            <Instagram className="size-8" />
+          </div>
+        )}
+      </div>
+      <p className="max-w-xs text-sm font-medium">
+        This Instagram Reel cannot be played inside the website because Instagram has restricted embedded playback on
+        this device/browser.
+      </p>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex items-center gap-1.5 rounded-xl bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground"
       >
-        <ExternalLink className="size-4" /> Open on Instagram
-      </a>
+        <RotateCcw className="size-4" /> Try again
+      </button>
     </div>
   );
 }
 
 function InstagramPlayer({ item, alt }: { item: ViewItem; alt: string }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  const [attempt, setAttempt] = useState<number>(0);
+  const loads = useRef<number>(0);
   useEffect(() => {
-    // Never spin forever: if Instagram's player hasn't loaded in 12s, show the fallback.
+    loads.current = 0;
+    // Never spin forever: if Instagram's player hasn't loaded in 12s, show the in-app message.
     const t = setTimeout(() => setState((s) => (s === "loading" ? "failed" : s)), 12000);
     return () => clearTimeout(t);
-  }, []);
-  if (state === "failed") return <InstagramFallback item={item} />;
+  }, [attempt]);
+  if (state === "failed") {
+    return (
+      <InstagramFallback
+        item={item}
+        onRetry={() => {
+          setState("loading");
+          setAttempt((a) => a + 1);
+        }}
+      />
+    );
+  }
   return (
     <div className="flex flex-col items-center gap-2 bg-background p-2">
       <div className="relative aspect-[9/16] w-full max-w-[min(340px,calc((70vh)*9/16))] overflow-hidden rounded-2xl border border-border bg-muted">
@@ -54,14 +81,23 @@ function InstagramPlayer({ item, alt }: { item: ViewItem; alt: string }) {
             <Loader2 className="size-6 animate-spin text-muted-foreground" />
           </div>
         )}
+        {/* Sandboxed: no popups and no top-level navigation, so Instagram can never open a new tab
+            or replace this page. If the player tries to navigate itself (a second load), Instagram
+            has refused in-site playback, and we show the in-app message instead. */}
         <iframe
+          key={attempt}
           src={instagramEmbedUrl(item)}
           title={alt}
           className="absolute inset-0 size-full"
           scrolling="no"
-          allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+          sandbox="allow-scripts allow-same-origin allow-presentation"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           allowFullScreen
-          onLoad={() => setState("ready")}
+          onLoad={() => {
+            loads.current += 1;
+            setState(loads.current > 1 ? "failed" : "ready");
+          }}
           onError={() => setState("failed")}
         />
       </div>
@@ -70,7 +106,7 @@ function InstagramPlayer({ item, alt }: { item: ViewItem; alt: string }) {
         onClick={() => setState("failed")}
         className="text-xs text-muted-foreground underline-offset-2 hover:underline"
       >
-        Not playing? Show options
+        Not playing?
       </button>
     </div>
   );
