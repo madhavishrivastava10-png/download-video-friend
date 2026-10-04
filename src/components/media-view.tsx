@@ -88,10 +88,17 @@ function InstagramCard({ label }: { label: string }) {
   );
 }
 
+const IG_POST_RE = /instagram\.com\/(?:[^/]+\/)?(?:reels?|p|tv)\/[A-Za-z0-9_-]+/;
+
 /** Renders a stored file, or an official embedded player for platforms like YouTube / Instagram. */
 export function MediaView({ item, mode, controls }: { item: ViewItem; mode: "thumb" | "player"; controls?: boolean }) {
   const [thumbFailed, setThumbFailed] = useState(false);
   const alt = item.caption ?? item.title ?? "Media";
+  // Older imports stored only an Instagram Reel's still cover picture. In the popup, play the
+  // original Reel through Instagram's official player instead of showing the still image.
+  if (mode === "player" && item.media_type === "image" && item.source_url && IG_POST_RE.test(item.source_url)) {
+    return <InstagramPlayer item={item} alt={alt} />;
+  }
   if (item.media_type === "embed") {
     const isIg = item.playback_url.includes("instagram.com");
     if (mode === "thumb") {
