@@ -106,7 +106,7 @@ function InstagramPlayer({ item, alt }: { item: ViewItem; alt: string }) {
         onClick={() => setState("failed")}
         className="text-xs text-muted-foreground underline-offset-2 hover:underline"
       >
-        Not playing?
+        Seeing “Watch on Instagram”? Tap here
       </button>
     </div>
   );
