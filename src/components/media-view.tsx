@@ -38,8 +38,8 @@ function InstagramFallback({ item, onRetry }: { item: ViewItem; onRetry: () => v
         )}
       </div>
       <p className="max-w-xs text-sm font-medium">
-        This Instagram Reel cannot be played inside the website because Instagram has restricted embedded playback on
-        this device/browser.
+        Instagram has restricted embedding for this Reel, so it can't play inside the website. Other Reels are not
+        affected.
       </p>
       <button
         type="button"
@@ -55,11 +55,13 @@ function InstagramFallback({ item, onRetry }: { item: ViewItem; onRetry: () => v
 function InstagramPlayer({ item, alt }: { item: ViewItem; alt: string }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
   const [attempt, setAttempt] = useState<number>(0);
-  const loads = useRef<number>(0);
+  const loaded = useRef<boolean>(false);
   useEffect(() => {
-    loads.current = 0;
-    // Never spin forever: if Instagram's player hasn't loaded in 12s, show the in-app message.
-    const t = setTimeout(() => setState((s) => (s === "loading" ? "failed" : s)), 12000);
+    loaded.current = false;
+    // Only a player that never loads at all counts as a failure — never guess from timing or reloads.
+    const t = setTimeout(() => {
+      if (!loaded.current) setState((s) => (s === "loading" ? "failed" : s));
+    }, 20000);
     return () => clearTimeout(t);
   }, [attempt]);
   if (state === "failed") {
@@ -82,8 +84,7 @@ function InstagramPlayer({ item, alt }: { item: ViewItem; alt: string }) {
           </div>
         )}
         {/* Sandboxed: no popups and no top-level navigation, so Instagram can never open a new tab
-            or replace this page. If the player tries to navigate itself (a second load), Instagram
-            has refused in-site playback, and we show the in-app message instead. */}
+            or replace this page. Instagram's own player decides per Reel whether video is included. */}
         <iframe
           key={attempt}
           src={instagramEmbedUrl(item)}
@@ -95,10 +96,9 @@ function InstagramPlayer({ item, alt }: { item: ViewItem; alt: string }) {
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
           allowFullScreen
           onLoad={() => {
-            loads.current += 1;
-            setState(loads.current > 1 ? "failed" : "ready");
+            loaded.current = true;
+            setState("ready");
           }}
-          onError={() => setState("failed")}
         />
       </div>
       <button
